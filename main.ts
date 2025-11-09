@@ -1,3 +1,7 @@
+// --------------------------------------------------------------------
+// TIME MOD
+// --------------------------------------------------------------------
+
 //% color=#FFA500 icon="\uf017" block="Time"
 namespace Time {
 
@@ -8,40 +12,105 @@ namespace Time {
         return num < 10 ? "0" + num : "" + num
     }
 
-    // 5x5 digit grids
+    // 5x5 digit grids for numeric HUD
     let digitImgs: Image[] = [
-        img`. # # # . # . . . # # . . . # . . . # . . # # # .`, // 0
-        img`. . # . . . # # . . . . # . . . . # . . # # # .`, // 1
-        img`# # # # . . . . . # . # # # . # . . . # # # # #`, // 2
-        img`# # # # . . . . . # . # # # . . . . . # # # # .`, // 3
-        img`# . . # . # . . # # # # # . . . # . . # . . # .`, // 4
-        img`# # # # # # . . . # # # # . . . . . # # # # .`, // 5
-        img`. # # # # # . . . # # # # . # . . . # . # # # #`, // 6
-        img`# # # # # . . . . # . . # . . . # . . # . . .`, // 7
-        img`. # # # . # . . . # # # . # . . . # . # # # .`, // 8
-        img`. # # # . # . . . # # # # . . . . # # # # .`  // 9
+        img`
+            . # # # .
+            # . . . #
+            # . . . #
+            # . . . #
+            . # # # .
+        `, // 0
+        img`
+            . . # . .
+            . # # . .
+            . . # . .
+            . . # . .
+            . # # # .
+        `, // 1
+        img`
+            # # # # .
+            . . . # .
+            . # # # .
+            # . . . .
+            # # # # .
+        `, // 2
+        img`
+            # # # # .
+            . . . # .
+            . # # # .
+            . . . # .
+            # # # # .
+        `, // 3
+        img`
+            # . . #
+            # . . #
+            # # # #
+            . . . #
+            . . . #
+        `, // 4
+        img`
+            # # # #
+            # . . .
+            # # # .
+            . . . #
+            # # # .
+        `, // 5
+        img`
+            . # # #
+            # . . .
+            # # # .
+            # . . #
+            . # # .
+        `, // 6
+        img`
+            # # # #
+            . . . #
+            . . # .
+            . # . .
+            . # . .
+        `, // 7
+        img`
+            . # # .
+            # . . #
+            . # # .
+            # . . #
+            . # # .
+        `, // 8
+        img`
+            . # # .
+            # . . #
+            . # # #
+            . . . #
+            # # # .
+        `  // 9
     ]
+
+    let colonImg = img`
+        . . . . .
+        . # . # .
+        . . . . .
+        . # . # .
+        . . . . .
+    `
+
+    let dotImg = img`
+        . . . . .
+        . . . . .
+        . . . . .
+        . . . . .
+        . # # . .
+    `
 
     function createNumberImage(value: string, color: number = 1): Image {
         let imgs: Image[] = []
         for (let i = 0; i < value.length; i++) {
             const c = value.charAt(i)
             if (c >= "0" && c <= "9") imgs.push(digitImgs[parseInt(c)].clone())
-            else if (c == ":") imgs.push(img`
-                . . . . .
-                . # . # .
-                . . . . .
-                . # . # .
-                . . . . .
-            `)
-            else if (c == ".") imgs.push(img`
-                . . . . .
-                . . . . .
-                . . . . .
-                . . . . .
-                . # # . .
-            `)
+            else if (c == ":") imgs.push(colonImg.clone())
+            else if (c == ".") imgs.push(dotImg.clone())
         }
+
         let width = imgs.length * 5
         let combined = image.create(width, 5)
         for (let i = 0; i < imgs.length; i++) {
@@ -92,17 +161,38 @@ namespace Time {
     }
 
     // --------------------------------------------------------------------
-    // TIMER
+    // TIMER (COUNTDOWN)
     // --------------------------------------------------------------------
-    let timerStart = 0
+    let timerTotal = 0
+    let timerRemaining = 0
     let timerRunning = false
+    let timerPaused = false
+    let timerLastUpdate = 0
 
-    //% blockId=time_timer_start
-    //% block="start timer"
+    //% blockId=time_timer_start_seconds
+    //% block="start timer for %seconds s"
     //% group="Timer"
-    export function startTimer(): void {
-        timerStart = control.millis()
+    export function startTimer(seconds: number): void {
+        timerTotal = Math.max(0, seconds)
+        timerRemaining = timerTotal
         timerRunning = true
+        timerPaused = false
+        timerLastUpdate = control.millis()
+    }
+
+    //% blockId=time_timer_pause
+    //% block="pause timer"
+    //% group="Timer"
+    export function pauseTimer(): void {
+        if (timerRunning) timerPaused = true
+    }
+
+    //% blockId=time_timer_unpause
+    //% block="unpause timer"
+    //% group="Timer"
+    export function unpauseTimer(): void {
+        if (timerRunning) timerPaused = false
+        timerLastUpdate = control.millis()
     }
 
     //% blockId=time_timer_stop
@@ -110,18 +200,27 @@ namespace Time {
     //% group="Timer"
     export function stopTimer(): void {
         timerRunning = false
+        timerPaused = false
+        timerRemaining = 0
     }
 
-    //% blockId=time_timer_elapsed
-    //% block="elapsed time (s)"
+    //% blockId=time_timer_remaining
+    //% block="time left (s)"
     //% group="Timer"
-    export function elapsedTime(): number {
+    export function timerLeft(): number {
         if (!timerRunning) return 0
-        return Math.floor((control.millis() - timerStart) / 10) / 100
+        const now = control.millis()
+        if (!timerPaused) {
+            const delta = (now - timerLastUpdate) / 1000
+            timerRemaining = Math.max(0, timerRemaining - delta)
+            timerLastUpdate = now
+            if (timerRemaining <= 0) timerRunning = false
+        }
+        return Math.floor(timerRemaining * 100) / 100
     }
 
     // --------------------------------------------------------------------
-    // STOPWATCH
+    // STOPWATCH (ELAPSED TIME)
     // --------------------------------------------------------------------
     let stopwatchStart = 0
     let stopwatchRunning = false
@@ -220,4 +319,6 @@ v1.18 – Fixed blit 11-arg issue, removed createImageSprite, HUD works online, 
 v1.19 – Corrected blit argument types, fixed all errors in v1.18, color HUD added.
 v1.20 – Added improved HUD customization and display features.
 v1.21 – XOR moved to Boolean group, lowercase block, maintains all previous improvements.
+v1.22 – Timer revamped: countdown, pause/unpause, stopwatch simplified, HUD improvements.
+v1.23 – Timer is proper countdown with start/pause/unpause/stop, `time left (s)` reporter added, stopwatch unchanged.
 */
