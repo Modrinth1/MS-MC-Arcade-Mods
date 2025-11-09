@@ -1,68 +1,223 @@
 //% color=#FFA500 icon="\uf017" block="Time"
 namespace Time {
 
-    // Helper function for left padding numbers with zeros
+    // --------------------------------------------------------------------
+    // Helpers
+    // --------------------------------------------------------------------
     function pad(num: number): string {
         return num < 10 ? "0" + num : "" + num
     }
 
-    // ---------- Clock Section ----------
-    //% blockId=clock_time block="time"
+    // 5x5 digit grids
+    let digitImgs: Image[] = [
+        img`. # # # . # . . . # # . . . # . . . # . . # # # .`, // 0
+        img`. . # . . . # # . . . . # . . . . # . . # # # .`, // 1
+        img`# # # # . . . . . # . # # # . # . . . # # # # #`, // 2
+        img`# # # # . . . . . # . # # # . . . . . # # # # .`, // 3
+        img`# . . # . # . . # # # # # . . . # . . # . . # .`, // 4
+        img`# # # # # # . . . # # # # . . . . . # # # # .`, // 5
+        img`. # # # # # . . . # # # # . # . . . # . # # # #`, // 6
+        img`# # # # # . . . . # . . # . . . # . . # . . .`, // 7
+        img`. # # # . # . . . # # # . # . . . # . # # # .`, // 8
+        img`. # # # . # . . . # # # # . . . . # # # # .`  // 9
+    ]
+
+    function createNumberImage(value: string, color: number = 1): Image {
+        let imgs: Image[] = []
+        for (let i = 0; i < value.length; i++) {
+            const c = value.charAt(i)
+            if (c >= "0" && c <= "9") imgs.push(digitImgs[parseInt(c)].clone())
+            else if (c == ":") imgs.push(img`
+                . . . . .
+                . # . # .
+                . . . . .
+                . # . # .
+                . . . . .
+            `)
+            else if (c == ".") imgs.push(img`
+                . . . . .
+                . . . . .
+                . . . . .
+                . . . . .
+                . # # . .
+            `)
+        }
+        let width = imgs.length * 5
+        let combined = image.create(width, 5)
+        for (let i = 0; i < imgs.length; i++) {
+            imgs[i].fill(color)
+            combined.blit(i * 5, 0, 5, 5, imgs[i], 0, 0, 0, 0, false, false)
+        }
+        return combined
+    }
+
+    // --------------------------------------------------------------------
+    // CLOCK / DATE
+    // --------------------------------------------------------------------
+    let simHour = 0
+    let simMinute = 0
+    let simDay = 1
+    let simMonth = 1
+    let simYear = 2025
+
+    //% blockId=time_clock_time
+    //% block="time"
     //% group="Clock"
     export function clockTime(): string {
-        // Approximate system time using running time in ms
-        const totalSeconds = control.millis() / 1000
-        const hours = Math.floor((totalSeconds / 3600) % 24)
-        const minutes = Math.floor((totalSeconds / 60) % 60)
-        return pad(hours) + ":" + pad(minutes)
+        return pad(simHour) + ":" + pad(simMinute)
     }
 
-    //% blockId=clock_date block="date"
+    //% blockId=time_clock_date
+    //% block="date"
     //% group="Clock"
     export function clockDate(): string {
-        // Fake date starting from 01/01/2025
-        const baseDay = 1
-        const baseMonth = 1
-        const baseYear = 2025
-        const daysSinceStart = Math.floor(control.millis() / (1000 * 60 * 60 * 24))
-        const day = (baseDay + daysSinceStart) % 30
-        const month = (baseMonth + Math.floor((baseDay + daysSinceStart) / 30)) % 12
-        const dd = pad(day || 1)
-        const mm = pad(month || 1)
-        return dd + "/" + mm + "/" + baseYear
+        return pad(simDay) + "/" + pad(simMonth) + "/" + simYear
     }
 
-    //% blockId=clock_display block="%timeOrDate kind %kindText"
-    //% timeOrDate.shadow="string"
-    //% kindText.defl="time"
+    //% blockId=time_set_time
+    //% block="set time to %hour | : %minute"
     //% group="Clock"
-    export function displayTimeOrDate(timeOrDate: string, kindText: string) {
-        return timeOrDate + " (" + kindText + ")"
+    export function setTime(hour: number, minute: number): void {
+        simHour = hour % 24
+        simMinute = minute % 60
     }
 
-    // ---------- Timer Section ----------
+    //% blockId=time_set_date
+    //% block="set date to %day / %month / %year"
+    //% group="Clock"
+    export function setDate(day: number, month: number, year: number): void {
+        simDay = Math.max(1, Math.min(31, day))
+        simMonth = Math.max(1, Math.min(12, month))
+        simYear = year
+    }
+
+    // --------------------------------------------------------------------
+    // TIMER
+    // --------------------------------------------------------------------
+    let timerStart = 0
+    let timerRunning = false
+
+    //% blockId=time_timer_start
+    //% block="start timer"
     //% group="Timer"
-    //% blockId=timer_start block="start timer"
-    export function startTimer(): void { }
-
-    //% blockId=timer_stop block="stop timer"
-    export function stopTimer(): void { }
-
-    //% blockId=timer_elapsed block="elapsed time"
-    export function elapsedTime(): number {
-        return 0
+    export function startTimer(): void {
+        timerStart = control.millis()
+        timerRunning = true
     }
 
-    // ---------- Stopwatch Section ----------
+    //% blockId=time_timer_stop
+    //% block="stop timer"
+    //% group="Timer"
+    export function stopTimer(): void {
+        timerRunning = false
+    }
+
+    //% blockId=time_timer_elapsed
+    //% block="elapsed time (s)"
+    //% group="Timer"
+    export function elapsedTime(): number {
+        if (!timerRunning) return 0
+        return Math.floor((control.millis() - timerStart) / 10) / 100
+    }
+
+    // --------------------------------------------------------------------
+    // STOPWATCH
+    // --------------------------------------------------------------------
+    let stopwatchStart = 0
+    let stopwatchRunning = false
+
+    //% blockId=time_stopwatch_start
+    //% block="start stopwatch"
     //% group="Stopwatch"
-    //% blockId=stopwatch_start block="start stopwatch"
-    export function startStopwatch(): void { }
+    export function startStopwatch(): void {
+        stopwatchStart = control.millis()
+        stopwatchRunning = true
+    }
 
-    //% blockId=stopwatch_stop block="stop stopwatch"
-    export function stopStopwatch(): void { }
+    //% blockId=time_stopwatch_stop
+    //% block="stop stopwatch"
+    //% group="Stopwatch"
+    export function stopStopwatch(): void {
+        stopwatchRunning = false
+    }
 
-    //% blockId=stopwatch_elapsed block="elapsed time"
+    //% blockId=time_stopwatch_elapsed
+    //% block="stopwatch time (s)"
+    //% group="Stopwatch"
     export function stopwatchElapsed(): number {
-        return 0
+        if (!stopwatchRunning) return 0
+        return Math.floor((control.millis() - stopwatchStart) / 10) / 100
+    }
+
+    // --------------------------------------------------------------------
+    // HUD / DISPLAY
+    // --------------------------------------------------------------------
+    let hud: Sprite = null
+
+    //% blockId=time_show_time_hud
+    //% block="show time HUD at x %x | y %y | color %color"
+    //% group="Display/HUD"
+    export function showTimeHUD(x: number, y: number, color: number = 1): void {
+        if (hud) hud.destroy()
+        hud = sprites.create(createNumberImage(clockTime(), color), SpriteKind.Player)
+        hud.setPosition(x, y)
+    }
+
+    //% blockId=time_show_stopwatch_hud
+    //% block="show stopwatch HUD at x %x | y %y | color %color"
+    //% group="Display/HUD"
+    export function showStopwatchHUD(x: number, y: number, color: number = 1): void {
+        if (hud) hud.destroy()
+        hud = sprites.create(createNumberImage(stopwatchElapsed() + "s", color), SpriteKind.Player)
+        hud.setPosition(x, y)
+    }
+
+    //% blockId=time_hide_hud
+    //% block="hide HUD"
+    //% group="Display/HUD"
+    export function hideHUD(): void {
+        if (hud) {
+            hud.destroy()
+            hud = null
+        }
     }
 }
+
+// --------------------------------------------------------------------
+// LOGIC (XOR inside existing Boolean group)
+// --------------------------------------------------------------------
+namespace logic {
+    //% blockId=logic_xor
+    //% block="%a xor %b"
+    //% group="Boolean"
+    export function xor(a: boolean, b: boolean): boolean {
+        return (a && !b) || (b && !a)
+    }
+}
+
+// --------------------------------------------------------------------
+// VERSION HISTORY
+// --------------------------------------------------------------------
+/*
+v1.01 – Initial Clock/Date reporters.
+v1.02 – Added Timer start/stop/elapsed.
+v1.03 – Added Stopwatch start/stop/elapsed.
+v1.04 – Initial HUD with TextSprite (broke).
+v1.05 – Numeric HUD grids added.
+v1.06 – Added milliseconds to 2 dp.
+v1.07 – XOR block in Logic.
+v1.08 – Removed kind dropdown.
+v1.09 – Fixed padStart errors.
+v1.10 – Fixed background/thread issues.
+v1.11 – HUD using countdown style from info.
+v1.12 – Line 107 fixed, stopwatch/timer functional.
+v1.13 – Fixed createTextSprite errors.
+v1.14 – HUD digits converted to grids.
+v1.15 – Typed Image[] arrays.
+v1.16 – Initial attempt at createImageSprite (online fails).
+v1.17 – Line 108 7-arg blit tried.
+v1.18 – Fixed blit 11-arg issue, removed createImageSprite, HUD works online, XOR works.
+v1.19 – Corrected blit argument types, fixed all errors in v1.18, color HUD added.
+v1.20 – Added improved HUD customization and display features.
+v1.21 – XOR moved to Boolean group, lowercase block, maintains all previous improvements.
+*/
